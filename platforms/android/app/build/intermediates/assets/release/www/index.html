@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" type="text/css" href="css/index.css">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
+    <script type="text/javascript" src="https://webapi.amap.com/maps?v=1.4.10&key=4cecb5dc0fd86b23e5ee94a2b6c0a3bd"></script>
+    <title>Hello World</title>
+    <script src="cordova.js"></script>
+    <script type="text/javascript" src="js/index.js"></script>
+    <script src="Cesium/Cesium.js"></script>
+
+    <style>
+        @import url(Cesium/Widgets/widgets.css);
+        @import url(Cesium/Widgets/BaseLayerPicker/BaseLayerPicker.css);
+        html, body, #cesiumContainer {
+            width: 100%; height: 98%; margin: 0; padding: 0; overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+<button onclick="locate_fly()">LOCATE</button>
+<button onclick="test(108.7628295732,34.0322465907)">1</button>
+<button onclick="test(108.7546968055,34.0304638943)">2</button>
+<button onclick="locate_fly()">3</button>
+<button onclick="locate_fly()">4</button>
+<div id="cesiumContainer"></div>
+<div id="baseLayerPickerContainer" style="position:absolute;top:60px;right:24px;width:38px;height:38px;"></div>
+
+<script>
+    Cesium.Ion.defaultAccessToken='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI5MTdjOGViZS1iODBjLTQxNzgtYjIyOC0xYjRjY2M0MWJiMjMiLCJpZCI6MzQ0MSwiaWF0IjoxNTM3NTA4Nzc5fQ.7jjLy2SJkM55S9Ig-MeOo1Uo13A9ku60J9kR9Zzv88M';
+    var viewer = new Cesium.Viewer('cesiumContainer',{
+        timeline : false,
+        animation : false,
+        shouldAnimate: true,
+        imageryProvider : new Cesium.UrlTemplateImageryProvider({
+            url : 'https://webst01.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}'
+        }),
+        baseLayerPicker: false
+
+    });
+
+    anno_WGS=new Cesium.UrlTemplateImageryProvider({
+        url: "http://t2.tianditu.gov.cn/DataServer?T=cva_w&x={x}&y={y}&l={z}"
+    });
+    Anno_WGS = viewer.imageryLayers.addImageryProvider(anno_WGS);
+
+    var location_offset;
+    var imageryViewModels = [];
+
+    function test(longitude,latitude){
+        location_point.position = Cesium.Cartesian3.fromDegrees(longitude,latitude);
+    }
+    imageryViewModels.push(new Cesium.ProviderViewModel({
+        name : '天地图',
+        iconUrl : Cesium.buildModuleUrl('Widgets/Images/ImageryProviders/naturalEarthII.png'),
+        tooltip : '国产天地图',
+        category : '国内常用',
+        creationFunction : function() {
+            location_offset = false;
+            return new Cesium.WebMapTileServiceImageryProvider({
+                url: "http://t0.tianditu.com/img_w/wmts?service=wmts&request=GetTile&version=1.0.0&LAYER=img&tileMatrixSet=w&TileMatrix={TileMatrix}&TileRow={TileRow}&TileCol={TileCol}&style=default&format=tiles"
+            });
+        }
+    }));
+    imageryViewModels.push(new Cesium.ProviderViewModel({
+        name : '谷歌离线地图',
+        iconUrl : "img/Avatar.png",
+        tooltip : 'offline',
+        category : '国内常用',
+        creationFunction : function() {
+            location_offset = false;
+            return new Cesium.UrlTemplateImageryProvider({
+                url: "satellite_en/{z}/{x}/{y}.jpg"
+            });
+        }
+    }));
+    //Create a CesiumWidget without imagery, if you haven't already done so.
+    var cesiumWidget = new Cesium.CesiumWidget('cesiumContainer', { imageryProvider: false });
+
+    //Finally, create the baseLayerPicker widget using our view models.
+    var layers = cesiumWidget.imageryLayers;
+    var baseLayerPicker = new Cesium.BaseLayerPicker('baseLayerPickerContainer', {
+        globe :viewer.scene.globe,
+        imageryProviderViewModels : imageryViewModels
+    });
+
+    //viewer.imageryLayers.addImageryProvider(anno_WGS);
+
+    var i=0;flag=0;
+    function tick() {
+        viewer.render();
+        i++;
+        if (i>50) {
+            i=0;
+            if (flag === 0) {
+                locate_fly();
+                flag=1;
+            } else {
+                locate();
+            }
+        }
+        Cesium.requestAnimationFrame(tick);
+    }
+    tick();
+    var location_point = viewer.entities.add({
+        point : {
+            pixelSize : 10,
+            color : Cesium.Color.YELLOW
+        }
+    });
+    function locate_fly() {
+        var onSuccess = function(position) {
+            if (location_offset) {
+                var gps = [position.coords.longitude, position.coords.latitude];
+                AMap.convertFrom(gps, 'gps', function (status, result) {
+                    if (result.info === 'ok') {
+                        var lnglats = result.locations; // Array.<LngLat>
+                        location_point.position = Cesium.Cartesian3.fromDegrees(lnglats[0].lng,lnglats[0].lat);
+                    }
+                });
+
+            }
+            else {location_point.position = Cesium.Cartesian3.fromDegrees(position.coords.longitude,position.coords.latitude);}
+            viewer.camera.flyTo({
+                destination : Cesium.Cartesian3.fromDegrees(position.coords.longitude,position.coords.latitude,18000.0)
+            });
+        };
+        // onError Callback receives a PositionError object
+        //
+        function onError(error) {
+            alert('code: '    + error.code    + '\n' +
+                'message: ' + error.message + '\n');
+        }
+        navigator.geolocation.getCurrentPosition(onSuccess, onError);
+
+    }
+    function locate() {
+        var onSuccess = function(position) {
+            if (location_offset) {
+                var gps = [position.coords.longitude, position.coords.latitude];
+                AMap.convertFrom(gps, 'gps', function (status, result) {
+                    if (result.info === 'ok') {
+                        var lnglats = result.locations; // Array.<LngLat>
+                        location_point.position = Cesium.Cartesian3.fromDegrees(lnglats[0].lng,lnglats[0].lat);
+                    }
+                });
+
+            }
+            else {location_point.position = Cesium.Cartesian3.fromDegrees(position.coords.longitude,position.coords.latitude);}
+
+        };
+        function onError(error) {
+            alert('code: '    + error.code    + '\n' +
+                'message: ' + error.message + '\n');
+        }
+        navigator.geolocation.getCurrentPosition(onSuccess, onError);
+    }
+
+</script>
+</body>
+</html>
