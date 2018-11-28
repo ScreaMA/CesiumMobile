@@ -1,0 +1,25 @@
+<?xml version='1.0' encoding='utf-8'?>
+<plugin id="cn.seekecho.hj_plugin" version="1.0.0" xmlns="http://apache.org/cordova/ns/plugins/1.0" xmlns:android="http://schemas.android.com/apk/res/android">
+    <name>HJ580</name>
+    <js-module name="HJ580" src="www/HJ580.js">
+        <clobbers target="navigator.HJ580" />
+    </js-module>
+    <platform name="android">
+        <config-file parent="/*" target="res/xml/config.xml">
+            <feature name="HJ580">
+                <param name="android-package" value="cn.seekecho.hj_plugin.HJ580" />
+            </feature>
+        </config-file>
+        <config-file target="AndroidManifest.xml" parent="/*">
+            <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+            <uses-permission android:name="android.permission.BLUETOOTH" />
+            <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+            <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
+        </config-file>
+        <config-file parent="/*" target="AndroidManifest.xml"></config-file>
+        <source-file src="src/android/HJ580.java" target-dir="src/cn/seekecho/hj_plugin" />
+        <source-file src="src/android/BluetoothLe.java" target-dir="src/cn/seekecho/hj_plugin" />
+        <source-file src="src/android/HolloBluetooth.java" target-dir="src/cn/seekecho/hj_plugin" />
+        <source-file src="src/android/ConvertData.java" target-dir="src/cn/seekecho/hj_plugin" />
+    </platform>
+</plugin>

@@ -4,11 +4,11 @@
     <link rel="stylesheet" type="text/css" href="css/index.css">
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
-    <script type="text/javascript" src="https://webapi.amap.com/maps?v=1.4.10&key=4cecb5dc0fd86b23e5ee94a2b6c0a3bd"></script>
     <title>Hello World</title>
     <script src="cordova.js"></script>
-    <script type="text/javascript" src="js/index.js"></script>
+    <script src="js/bluetooth.js"></script>
     <script src="Cesium/Cesium.js"></script>
+    <!--<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: gap:cdvfile:https://ssl.gstatic.com 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; media-src *;img-src *">-->
 
     <style>
         @import url(Cesium/Widgets/widgets.css);
@@ -16,41 +16,66 @@
         html, body, #cesiumContainer {
             width: 100%; height: 98%; margin: 0; padding: 0; overflow: hidden;
         }
+        #status_show {
+            left : 30px;
+            top: 70px;
+            position: absolute;
+            background-color: white;
+            font-family: 'Source Sans Pro', Helvetica, Arial, sans-serif;
+            border-radius: 3px;
+        }
     </style>
 </head>
 <body>
-<button onclick="locate_fly()">LOCATE</button>
-<button onclick="test(108.7628295732,34.0322465907)">1</button>
-<button onclick="test(108.7546968055,34.0304638943)">2</button>
-<button onclick="locate_fly()">3</button>
-<button onclick="locate_fly()">4</button>
+<button onclick="scan()">scan</button>
+<button onclick="connect(500)">connect</button>
+<button onclick="disconnect()">disconnect</button>
+<button onclick="send()">send</button>
 <div id="cesiumContainer"></div>
+<div id="status_show"></div>
 <div id="baseLayerPickerContainer" style="position:absolute;top:60px;right:24px;width:38px;height:38px;"></div>
-
 <script>
     Cesium.Ion.defaultAccessToken='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI5MTdjOGViZS1iODBjLTQxNzgtYjIyOC0xYjRjY2M0MWJiMjMiLCJpZCI6MzQ0MSwiaWF0IjoxNTM3NTA4Nzc5fQ.7jjLy2SJkM55S9Ig-MeOo1Uo13A9ku60J9kR9Zzv88M';
     var viewer = new Cesium.Viewer('cesiumContainer',{
         timeline : false,
         animation : false,
         shouldAnimate: true,
-        imageryProvider : new Cesium.UrlTemplateImageryProvider({
-            url : 'https://webst01.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}'
-        }),
-        baseLayerPicker: false
+        baseLayerPicker: false,/*
+        terrainProvider : new Cesium.CesiumTerrainProvider({
+            url : "cdvfile://localhost/persistent/MAP/Terrain/"
+        })*/
 
     });
 
-    anno_WGS=new Cesium.UrlTemplateImageryProvider({
+    var anno_WGS=new Cesium.UrlTemplateImageryProvider({
         url: "http://t2.tianditu.gov.cn/DataServer?T=cva_w&x={x}&y={y}&l={z}"
     });
-    Anno_WGS = viewer.imageryLayers.addImageryProvider(anno_WGS);
+    var Anno_WGS = viewer.imageryLayers.addImageryProvider(anno_WGS);
 
     var location_offset;
     var imageryViewModels = [];
 
-    function test(longitude,latitude){
-        location_point.position = Cesium.Cartesian3.fromDegrees(longitude,latitude);
-    }
+    var terrainViewModels = [];
+    terrainViewModels.push(new Cesium.ProviderViewModel({
+        name : 'WGS84 Ellipsoid',
+        iconUrl : Cesium.buildModuleUrl('Widgets/Images/TerrainProviders/Ellipsoid.png'),
+        tooltip : 'WGS84 standard ellipsoid, also known as EPSG:4326',
+        category: '卫星测量',
+        creationFunction : function() {
+            return new Cesium.EllipsoidTerrainProvider();
+        }
+    }));
+    terrainViewModels.push(new Cesium.ProviderViewModel({
+        name : '测试用离线地形',
+        iconUrl : Cesium.buildModuleUrl('Widgets/Images/TerrainProviders/CesiumWorldTerrain.png'),
+        tooltip : 'High-resolution global terrain tileset curated from several datasources and hosted by Cesium ion',
+        category: '卫星测量',
+        creationFunction : function(){
+            return new Cesium.CesiumTerrainProvider({
+                url : "cdvfile://localhost/sdcard/MAP/Terrain/"
+            })
+        }
+    }));
     imageryViewModels.push(new Cesium.ProviderViewModel({
         name : '天地图',
         iconUrl : Cesium.buildModuleUrl('Widgets/Images/ImageryProviders/naturalEarthII.png'),
@@ -71,10 +96,11 @@
         creationFunction : function() {
             location_offset = false;
             return new Cesium.UrlTemplateImageryProvider({
-                url: "satellite_en/{z}/{x}/{y}.jpg"
+                url: "cdvfile://localhost/sdcard/MAP/satellite/satellite/{z}/{x}/{y}.jpg"
             });
         }
     }));
+
     //Create a CesiumWidget without imagery, if you haven't already done so.
     var cesiumWidget = new Cesium.CesiumWidget('cesiumContainer', { imageryProvider: false });
 
@@ -82,12 +108,67 @@
     var layers = cesiumWidget.imageryLayers;
     var baseLayerPicker = new Cesium.BaseLayerPicker('baseLayerPickerContainer', {
         globe :viewer.scene.globe,
-        imageryProviderViewModels : imageryViewModels
+        imageryProviderViewModels : imageryViewModels,
+        terrainProviderViewModels: terrainViewModels
     });
 
     //viewer.imageryLayers.addImageryProvider(anno_WGS);
+    var point = viewer.entities.add({
+        point : {
+            pixelSize : 20,
+            color :Cesium.Color.YELLOW
+        },
+        position:Cesium.Cartesian3.fromDegrees(108.761157,34.03524,0)
+    });
+    /*function connect() {
+        var dom = document.getElementById('status_show');
+        if (address === '')
+            return;
+        navigator.HJ580.connect(address, //连接设备时需要指定设备地址
+            function (res) {
+                //连接成功
+                dom.innerText = "connect successfully";
+                // 以一秒为周期不断读取蓝牙数据。
+                // 注意：蓝牙模块最大传输长度为20，大于此长度会自动切分。
+                // 所以读取数据时有可能一次读取并不能获得完整的数据，需要根据数据内容确定一次传输是否接收完成
+                // 比如，在消息中天界结束符号或者判断消息中后大括号“}”的数量
+                setInterval(
+                    function () {
+                        navigator.HJ580.readData(
+                            function (data) {
+                                if (data.msg.length) {
+                                    dom.innerText += '\n';
+                                    //dom.innerText += data.msg; //收到的信息
+                                    long = parseFloat(data.msg.match(/a(.*)a/)[1]);
+                                    lat = parseFloat(data.msg.match(/b(.*)b/)[1]);
+                                    time = parseFloat(data.msg.match(/c(.*)c/)[1]);
+                                    id = parseFloat(data.msg.match(/i(.*)i/)[1]);
+                                    if (long && lat && time && id)
+                                    {
+                                        dom.innerText +=long;
+                                        dom.innerText +=lat;
+                                        dom.innerText +=time;
+                                        dom.innerText +=id;
+                                        point.position=Cesium.Cartesian3.fromDegrees(long,lat,0);
+                                    }
+                                    if (dom.innerText.length>100) dom.innerText ="";
+                                }
+                            }
+                        )
+                    }, 1000
+                );
+            },
+            function (err) {
+                alert(err);
+            }
+        )
+    }*/
 
-    var i=0;flag=0;
+
+    var i=0;
+    var flag=0;
+    var time_count=0;
+    var point_long,point_lat,point_id,point_time;
     function tick() {
         viewer.render();
         i++;
@@ -100,6 +181,7 @@
                 locate();
             }
         }
+
         Cesium.requestAnimationFrame(tick);
     }
     tick();

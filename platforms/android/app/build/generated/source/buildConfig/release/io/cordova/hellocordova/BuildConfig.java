@@ -8,6 +8,6 @@ public final class BuildConfig {
   public static final String APPLICATION_ID = "io.cordova.hellocordova";
   public static final String BUILD_TYPE = "release";
   public static final String FLAVOR = "";
-  public static final int VERSION_CODE = 10003;
-  public static final String VERSION_NAME = "1.0.3";
+  public static final int VERSION_CODE = 10005;
+  public static final String VERSION_NAME = "1.0.5";
 }
